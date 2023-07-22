@@ -14,7 +14,7 @@ Motor Control: The car utilizes Pulse Width Modulation (PWM) to control the spee
 Autonomous Behavior: Once powered on, the embedded car autonomously follows the light source. The car can execute precise turns and maneuvers to keep the light source within its optimal sensing range.
 
 Photos of the car
-![image](https://github.com/ryanly36/embedded-car/blob/main/photos/embedded-car1.jpg)
+![Embedded Car](photos/embedded-car1.jpg)
 
 ![image](https://github.com/UCR-CS110-S23/project-recipe-room/assets/57569580/cf3732e1-2be7-481c-b35a-b679dd1e910e)
 
