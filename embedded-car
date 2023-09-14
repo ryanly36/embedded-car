@@ -1,0 +1,221 @@
+#define ENA 5
+#define IN1 6
+#define IN2 7
+#define IN3 8
+#define IN4 9
+#define ENB 10
+const int iPin = 2;
+
+
+volatile byte state = false;
+int sensorValue1, sensorValue2;
+float volts1, volts2;
+float leftMotor, rightMotor; // motor commands
+int error;
+
+
+enum State {
+ BASE,
+ TURN_RIGHT_HIGH,
+ TURN_RIGHT_LOW,
+ TURN_LEFT_HIGH,
+ TURN_LEFT_LOW
+};
+
+
+State currentState = BASE;
+
+
+void setup() {
+ setupMotors();
+ Serial.begin(115200);
+ pinMode(iPin, INPUT_PULLUP); // reset motors
+ attachInterrupt(digitalPinToInterrupt(iPin), interrupt, CHANGE);
+}
+
+
+void interrupt() { // define the iPin variable that i set earlier
+ if (digitalRead(iPin) == LOW) {
+   state = true;
+   digitalWrite(IN1, LOW);
+   digitalWrite(IN2, LOW);
+   digitalWrite(IN3, LOW);
+   digitalWrite(IN4, LOW);
+ }
+}
+
+
+void loop() {
+ sensorRead();
+ calcMotorAction();
+ driveMotors();
+}
+
+
+void setupMotors() {
+ pinMode(ENA, OUTPUT); //Set control pins to be outputs
+ pinMode(IN1, OUTPUT);
+ pinMode(IN2, OUTPUT);
+ pinMode(ENB, OUTPUT); //Set control pins to be outputs
+ pinMode(IN3, OUTPUT); 
+ pinMode(IN4, OUTPUT);
+ analogWrite(ENA, 0); // this ranges from 0 - 255 where 0 is off and 255 is 100%
+ analogWrite(ENB, 0);
+}
+
+
+void sensorRead() { // this allows me to read the values as real numbers so it
+// makes it easier to debug and code the state machines of different speeds
+ sensorValue1 = analogRead(A1);
+ Serial.print(sensorValue1);
+ Serial.print(" = ");
+ volts1 = ((float)(sensorValue1))*5.0/1024.0; //*5 so 0-5 volts and /1024 normalizes
+ Serial.print(volts1);
+ Serial.println(" V");
+ sensorValue2 = analogRead(A2);
+ Serial.print(sensorValue2);
+ Serial.print(" = ");
+ volts2 = ((float)(sensorValue2))*5.0/1024.0;
+ Serial.print(volts2);
+ Serial.println(" V");
+}
+
+
+void calcMotorAction() { // state machines that using LDRs and volt values read
+ error = sensorValue2 - sensorValue1;
+ switch (currentState) {
+   case BASE:
+     if (error > 0 && volts2 > 3.5) {
+       currentState = TURN_RIGHT_HIGH;
+       leftMotor = 75;
+       rightMotor = 0;
+     } else if (error > 0 && volts2 > 1.5) {
+       currentState = TURN_RIGHT_LOW;
+       leftMotor = 25;
+       rightMotor = 0;
+     } else if (error < 0 && volts1 > 3.5) {
+       currentState = TURN_LEFT_HIGH;
+       leftMotor = 0;
+       rightMotor = 75;
+     } else if (error < 0 && volts1 > 1.5) {
+       currentState = TURN_LEFT_LOW;
+       leftMotor = 0;
+       rightMotor = 25;
+     } else {
+       leftMotor = 0;
+       rightMotor = 0;
+     }
+     break;
+
+
+   case TURN_RIGHT_HIGH:
+     if (error > 0 && volts2 > 1.5) {
+       currentState = TURN_RIGHT_LOW;
+       leftMotor = 25;
+       rightMotor = 0;
+     } else if (error < 0 && volts1 > 3.5) {
+       currentState = TURN_LEFT_HIGH;
+       leftMotor = 0;
+       rightMotor = 75;
+     } else if (error < 0 && volts1 > 1.5) {
+       currentState = TURN_LEFT_LOW;
+       leftMotor = 0;
+       rightMotor = 25;
+     }
+     break;
+
+
+   case TURN_RIGHT_LOW:
+     if (error > 0 && volts2 > 3.5) {
+       currentState = TURN_RIGHT_HIGH;
+       leftMotor = 75;
+       rightMotor = 0;
+     } else if (error < 0 && volts1 > 3.5) {
+       currentState = TURN_LEFT_HIGH;
+       leftMotor = 0;
+       rightMotor = 75;
+     } else if (error < 0 && volts1 > 1.5) {
+       currentState = TURN_LEFT_LOW;
+       leftMotor = 0;
+       rightMotor = 25;
+     }
+     break;
+
+
+   case TURN_LEFT_HIGH:
+     if (error > 0 && volts2 > 3.5) {
+       currentState = TURN_RIGHT_HIGH;
+       leftMotor = 75;
+       rightMotor = 0;
+     } else if (error > 0 && volts2 > 1.5) {
+       currentState = TURN_RIGHT_LOW;
+       leftMotor = 25;
+       rightMotor = 0;
+     } else if (error < 0 && volts1 > 1.5) {
+       currentState = TURN_LEFT_LOW;
+       leftMotor = 0;
+       rightMotor = 25;
+     }
+     break;
+
+
+   case TURN_LEFT_LOW:
+     if (error > 0 && volts2 > 3.5) {
+       currentState = TURN_RIGHT_HIGH;
+       leftMotor = 75;
+       rightMotor = 0;
+     } else if (error > 0 && volts2 > 1.5) {
+       currentState = TURN_RIGHT_LOW;
+       leftMotor = 25;
+       rightMotor = 0;
+     } else if (error < 0 && volts1 > 3.5) {
+       currentState = TURN_LEFT_HIGH;
+       leftMotor = 0;
+       rightMotor = 75;
+     }
+     break;
+
+
+   default:
+     break;
+ }
+}
+
+
+
+
+void driveMotors() {
+ if (state) {
+   return;
+ }
+
+
+ // pulse width modulation, it can range from 0-255
+ int PwmA = 255.0 * leftMotor / 100.0; // 8 bit PWM
+ int PwmB = 255.0 * rightMotor / 100.0;
+
+
+ PwmA = constrain(PwmA, 0, 255); // keeps it in this range
+ PwmB = constrain(PwmB, 0, 255); // keeps it in this range
+
+// controls the direction and speed of motors
+ if (leftMotor > 0) {
+   digitalWrite(IN1, HIGH); // left motor forward
+   digitalWrite(IN2, LOW); 
+   analogWrite(ENA, PwmA); // set speed
+ } else {
+   digitalWrite(IN1, LOW); // left motor reverse
+   digitalWrite(IN2, HIGH);
+   analogWrite(ENA, -PwmA); // set speed, fix sign (must be positive)
+ }
+ if (rightMotor > 0) {
+   digitalWrite(IN3, HIGH); // right motor forward
+   digitalWrite(IN4, LOW); 
+   analogWrite(ENB, PwmB); // set speed
+ } else {
+   digitalWrite(IN3, LOW); //  right motor reverse 
+   digitalWrite(IN4, HIGH); 
+   analogWrite(ENB, -PwmB); // set speed, fix sign (must be positive)
+ }
+}
+
